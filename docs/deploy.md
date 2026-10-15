@@ -27,7 +27,7 @@ Cadastre os secrets **antes** do primeiro push: o `gh repo create ... --push` j√
 
 ```bash
 cd ~/Repos/Verto
-gh repo create verto-app --private --source=. --remote=origin
+gh repo create verto-api --private --source=. --remote=origin
 gh secret set VPS_HOST --body "178.104.160.8"
 gh secret set VPS_USER --body "deploy"
 gh secret set VPS_SSH_KEY < ~/.ssh/billfolder_deploy_key
