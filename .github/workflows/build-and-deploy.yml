@@ -1,0 +1,124 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build & Push image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore + build + test
+        run: |
+          dotnet restore
+          dotnet build --no-restore --configuration Release
+          dotnet test --no-build --configuration Release --verbosity minimal
+
+      - name: Lowercase image owner
+        id: image
+        run: |
+          echo "name=${REPO_OWNER@L}/verto-api" >> "$GITHUB_OUTPUT"
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=,suffix=,format=short
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" 'bash -se' <<'REMOTE_EOF'
+          set -euo pipefail
+          # Verto shares the BillFolder compose project so it reaches the same Postgres container.
+          cd /opt/billfolder
+
+          echo "==> Pulling latest Verto image..."
+          docker compose pull verto-api
+
+          echo "==> Recreating Verto container..."
+          docker compose up -d verto-api
+
+          echo "==> Cleaning up dangling images..."
+          docker image prune -f
+
+          echo "==> Waiting for /v1/health to respond..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8081/v1/health > /dev/null 2>&1; then
+              echo "✓ Verto healthy on attempt $i"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "✗ Verto failed to become healthy after 60s"
+              docker compose logs verto-api --tail=80
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "==> Smoke test through nginx..."
+          curl -fsS https://verto-api.billfolder.app/v1/health > /dev/null
+          echo "✓ Deploy complete"
+          REMOTE_EOF

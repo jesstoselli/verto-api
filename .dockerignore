@@ -1,0 +1,51 @@
+# ============================================================================
+# .dockerignore — arquivos NÃO copiados pra dentro do build context
+# ============================================================================
+# Resultado: build mais rápido + imagem mais limpa + sem leak de stuff sensível
+# ============================================================================
+
+# Build outputs (são regenerados dentro do container)
+**/bin/
+**/obj/
+
+# IDE
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+
+# Volumes locais do Postgres (jamais — pode ter GB)
+**/postgres_data/
+**/postgres_dev_data/
+
+# Git e CI
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Docs
+README.md
+*.md
+LICENSE
+
+# DB (schema só é usado pelo docker-compose, não pela API)
+db/
+
+# Docker (manifest do compose não vai pra imagem)
+docker-compose*.yml
+Dockerfile
+
+# Env / config local (nunca leakar pra imagem)
+.env
+.env.local
+**/appsettings.Development.json
+**/appsettings.Local.json
+
+# Outputs de testes
+**/TestResults/
+**/coverage*
+
+# Misc
+.DS_Store
+*.log
