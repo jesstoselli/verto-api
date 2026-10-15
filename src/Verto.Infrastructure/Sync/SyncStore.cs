@@ -38,7 +38,10 @@ public sealed class SyncStore : ISyncStore
         _dataSource = dataSource;
     }
 
-    public async Task<IReadOnlyList<long>> UpsertBatchAsync(
+    // Class 22 = data exception: content System.Text.Json accepts but jsonb does not.
+    private const string DataExceptionClass = "22";
+
+    public async Task<IReadOnlyList<long?>> UpsertBatchAsync(
         Guid userId,
         IReadOnlyList<SyncChangeIn> changes,
         CancellationToken ct)
@@ -56,9 +59,13 @@ public sealed class SyncStore : ISyncStore
             await lockCommand.ExecuteNonQueryAsync(ct);
         }
 
-        var versions = new List<long>(changes.Count);
+        var versions = new List<long?>(changes.Count);
         foreach (var change in changes)
         {
+            // One unstorable record must not roll back the rest of the batch, or the
+            // client's outbox would retry the same poisoned push forever.
+            await transaction.SaveAsync("change", ct);
+
             await using var command = new NpgsqlCommand(UpsertSql, connection, transaction);
             command.Parameters.Add(new NpgsqlParameter { Value = userId });
             command.Parameters.Add(new NpgsqlParameter { Value = change.EntityType });
@@ -75,8 +82,16 @@ public sealed class SyncStore : ISyncStore
                 NpgsqlDbType = NpgsqlDbType.TimestampTz,
             });
 
-            var version = await command.ExecuteScalarAsync(ct);
-            versions.Add((long)version!);
+            try
+            {
+                var version = await command.ExecuteScalarAsync(ct);
+                versions.Add((long)version!);
+            }
+            catch (PostgresException ex) when (ex.SqlState.StartsWith(DataExceptionClass, StringComparison.Ordinal))
+            {
+                await transaction.RollbackAsync("change", ct);
+                versions.Add(null);
+            }
         }
 
         await transaction.CommitAsync(ct);

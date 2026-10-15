@@ -124,4 +124,27 @@ public sealed class SyncPushTests : IClassFixture<ApiWebApplicationFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    [Theory]
+    [InlineData("a\\u0000b")]
+    [InlineData("\\ud800")]
+    public async Task Push_TextPostgresCannotStore_IsRejectedWithoutBlockingTheBatch(string escapedText)
+    {
+        using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
+        var badId = Guid.NewGuid();
+        var goodId = Guid.NewGuid();
+        var json = "{\"changes\":["
+            + "{\"entityType\":\"inbox_item\",\"id\":\"" + badId + "\",\"clientUpdatedAt\":\"2026-10-15T12:00:00Z\","
+            + "\"payload\":{\"text\":\"" + escapedText + "\",\"createdAt\":\"x\",\"source\":\"share\",\"state\":\"raw\"}},"
+            + "{\"entityType\":\"inbox_item\",\"id\":\"" + goodId + "\",\"clientUpdatedAt\":\"2026-10-15T12:00:00Z\","
+            + "\"payload\":{\"text\":\"ok\",\"createdAt\":\"x\",\"source\":\"app\",\"state\":\"raw\"}}]}";
+        using var body = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync(new Uri("/v1/sync/push", UriKind.Relative), body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<Verto.Application.Dtos.Sync.PushResponse>();
+        result!.Accepted.Select(a => a.Id).Should().Equal(goodId);
+        result.Rejected.Should().ContainEquivalentOf(new { Id = badId, Error = "invalid_payload" });
+    }
 }

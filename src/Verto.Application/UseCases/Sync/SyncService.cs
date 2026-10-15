@@ -56,13 +56,23 @@ public sealed class SyncService
             }
         }
 
-        IReadOnlyList<long> versions = accepted.Count == 0
+        IReadOnlyList<long?> versions = accepted.Count == 0
             ? []
             : await _store.UpsertBatchAsync(userId, accepted, ct);
 
-        var acceptedOut = accepted
-            .Select((change, index) => new PushAccepted(change.EntityType, change.Id, versions[index]))
-            .ToList();
+        var acceptedOut = new List<PushAccepted>(accepted.Count);
+        for (var i = 0; i < accepted.Count; i++)
+        {
+            var change = accepted[i];
+            if (versions[i] is { } version)
+            {
+                acceptedOut.Add(new PushAccepted(change.EntityType, change.Id, version));
+            }
+            else
+            {
+                rejected.Add(new PushRejected(change.EntityType, change.Id, "invalid_payload"));
+            }
+        }
 
         return OperationResult.Ok(new PushResponse(acceptedOut, rejected));
     }
