@@ -1,0 +1,177 @@
+# top-most EditorConfig file
+root = true
+
+# ============================================================================
+# General — todos os arquivos
+# ============================================================================
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Markdown / JSON / YAML usam 2 espaços
+[*.{md,json,yml,yaml}]
+indent_size = 2
+
+# Arquivos XML do .NET (csproj, props, targets) usam 2 espaços
+[*.{csproj,xml,props,targets,config}]
+indent_size = 2
+
+# ============================================================================
+# C# code style
+# ============================================================================
+[*.cs]
+
+# --- Estilo de código moderno ---
+
+# File-scoped namespaces (C# 10+)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# 'var' quando o tipo é óbvio (ex: var x = new MyClass())
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_elsewhere = false:silent
+
+# Sempre usar braces, mesmo em ifs de uma linha
+csharp_prefer_braces = true:warning
+
+# Expression-bodied members quando cabe em uma linha
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_constructors = false:silent
+
+# Pattern matching moderno
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+
+# Collection expressions (C# 12+)
+dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion
+
+# Using directives fora do namespace, System primeiro
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# Modifiers em ordem padrão
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:warning
+
+# Readonly quando possível
+dotnet_style_readonly_field = true:suggestion
+
+# ============================================================================
+# Naming conventions
+# ============================================================================
+
+# Interfaces começam com I
+dotnet_naming_rule.interfaces_should_start_with_i.severity = warning
+dotnet_naming_rule.interfaces_should_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_should_start_with_i.style = i_prefix_pascal
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_style.i_prefix_pascal.required_prefix = I
+dotnet_naming_style.i_prefix_pascal.capitalization = pascal_case
+
+# Métodos async terminam com Async
+dotnet_naming_rule.async_methods_end_in_async.severity = warning
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_methods
+dotnet_naming_rule.async_methods_end_in_async.style = async_suffix
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+
+dotnet_naming_style.async_suffix.required_suffix = Async
+dotnet_naming_style.async_suffix.capitalization = pascal_case
+
+# Campos privados começam com _ (camelCase)
+dotnet_naming_rule.private_fields_with_underscore.severity = warning
+dotnet_naming_rule.private_fields_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_with_underscore.style = underscore_camel
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+
+# Constantes em PascalCase
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+# Métodos públicos em PascalCase
+dotnet_naming_rule.public_members_pascal.severity = warning
+dotnet_naming_rule.public_members_pascal.symbols = public_members
+dotnet_naming_rule.public_members_pascal.style = pascal
+
+dotnet_naming_symbols.public_members.applicable_kinds = method,property,event
+dotnet_naming_symbols.public_members.applicable_accessibilities = public,internal,protected,protected_internal,private_protected
+
+# ============================================================================
+# Severities específicas (Roslyn + Meziantou)
+# ============================================================================
+
+# CA2007: Do not directly await a Task without ConfigureAwait (não fazemos library, fazemos app)
+dotnet_diagnostic.CA2007.severity = none
+
+# MA0004: Use ConfigureAwait (Meziantou equivalent of CA2007).
+# ASP.NET Core não tem SynchronizationContext, então ConfigureAwait é noise.
+dotnet_diagnostic.MA0004.severity = none
+
+# MA0048: File name should match type name (já fazemos isso, ferramenta dá falso positivo)
+dotnet_diagnostic.MA0048.severity = none
+
+# MA0051: Method is too long (subjetivo, deixa code review julgar)
+dotnet_diagnostic.MA0051.severity = none
+
+# MA0006: Use String.Equals instead of == (== em string é fine pra app code)
+dotnet_diagnostic.MA0006.severity = none
+
+# MA0011: IFormatProvider is missing (em app context, default culture é OK)
+dotnet_diagnostic.MA0011.severity = suggestion
+
+# MA0016: Prefer using collection abstraction (ICollection vs List) — deixa suggestion
+dotnet_diagnostic.MA0016.severity = suggestion
+
+# IDE0058: Expression value is never used — comum em fluent builders
+dotnet_diagnostic.IDE0058.severity = suggestion
+
+# ============================================================================
+# Test project — relaxa regras específicas pra testes
+# ============================================================================
+[**/tests/**/*.cs]
+
+# Permite método Test_Should_Do_When_X (com underscores)
+dotnet_diagnostic.CA1707.severity = none
+
+# Não exige Async suffix em métodos de teste (xUnit não liga)
+dotnet_diagnostic.VSTHRD200.severity = none
+
+# Permite [Fact] em métodos não-async sem reclamar
+dotnet_diagnostic.MA0040.severity = none
+
+# ============================================================================
+# EF Core migrations — código auto-gerado, segue padrão da ferramenta
+# ============================================================================
+[**/Migrations/*.cs]
+
+# Block-scoped namespace é o que o EF Core gera por default
+dotnet_diagnostic.IDE0161.severity = none
+
+# Permite usings desnecessários (EF gera defensivamente)
+dotnet_diagnostic.IDE0005.severity = none
+
+# Permite valores não usados (Designer.cs tem patterns de attributes que disparam)
+dotnet_diagnostic.IDE0059.severity = none
+
+# Permite namespace antigo/longo
+dotnet_diagnostic.MA0047.severity = none

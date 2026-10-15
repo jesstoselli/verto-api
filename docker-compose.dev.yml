@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: verto-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: verto
+      POSTGRES_USER: verto
+      POSTGRES_PASSWORD: verto_dev
+    ports:
+      # 5432 is taken by the BillFolder dev database.
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verto -d verto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+    name: verto_postgres_dev_data

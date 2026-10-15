@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Verto.Api/Verto.Api.csproj" />
+    <Project Path="src/Verto.Application/Verto.Application.csproj" />
+    <Project Path="src/Verto.Domain/Verto.Domain.csproj" />
+    <Project Path="src/Verto.Infrastructure/Verto.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Verto.Api.Tests/Verto.Api.Tests.csproj" />
+  </Folder>
+</Solution>

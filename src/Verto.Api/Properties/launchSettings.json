@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__Postgres": "Host=localhost;Port=5433;Database=verto;Username=verto;Password=verto_dev",
+        "Jwt__Key": "local-development-only-key-with-32-plus-characters",
+        "Auth__AllowSignup": "true",
+        "Database__MigrateOnStartup": "true"
+      }
+    }
+  }
+}
