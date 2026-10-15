@@ -66,4 +66,26 @@ public sealed class SyncService
 
         return OperationResult.Ok(new PushResponse(acceptedOut, rejected));
     }
+
+    public async Task<OperationResult<PullResponse>> PullAsync(
+        Guid userId,
+        long since,
+        int? limit,
+        CancellationToken ct = default)
+    {
+        if (since < 0)
+        {
+            return OperationResult.Fail<PullResponse>("validation_error", "O cursor não pode ser negativo.");
+        }
+
+        var pageSize = Math.Clamp(limit ?? DefaultPullLimit, 1, MaxPullLimit);
+
+        // One extra row tells whether another page exists without a COUNT query.
+        var rows = await _store.ReadSinceAsync(userId, since, pageSize + 1, ct);
+        var hasMore = rows.Count > pageSize;
+        var page = hasMore ? rows.Take(pageSize).ToList() : rows;
+        var cursor = page.Count == 0 ? since : page[^1].ServerVersion;
+
+        return OperationResult.Ok(new PullResponse(page, cursor, hasMore));
+    }
 }

@@ -25,6 +25,21 @@ public static class SyncEndpoints
             return HttpResults.ToHttpResult(await sync.PushAsync(userId, request, ct));
         });
 
+        group.MapGet("/pull", async (
+            long? since,
+            int? limit,
+            ClaimsPrincipal principal,
+            SyncService sync,
+            CancellationToken ct) =>
+        {
+            if (!principal.TryGetUserId(out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            return HttpResults.ToHttpResult(await sync.PullAsync(userId, since ?? 0, limit, ct));
+        });
+
         return app;
     }
 }

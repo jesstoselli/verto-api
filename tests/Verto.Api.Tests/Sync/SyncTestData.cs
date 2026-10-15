@@ -29,4 +29,15 @@ public static class SyncTestData
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<PushResponse>())!;
     }
+
+    public static async Task<PullResponse> PullAsync(HttpClient client, long since, int? limit = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        var url = limit is null
+            ? "/v1/sync/pull?since=" + since.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : "/v1/sync/pull?since=" + since.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + "&limit=" + limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return (await client.GetFromJsonAsync<PullResponse>(new Uri(url, UriKind.Relative)))!;
+    }
 }
