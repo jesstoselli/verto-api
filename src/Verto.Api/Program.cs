@@ -1,10 +1,40 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using Verto.Api.Endpoints;
 using Verto.Infrastructure;
+using Verto.Infrastructure.Auth;
 using Verto.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((options, configuredJwt) =>
+    {
+        var jwtOpts = configuredJwt.Value;
+
+        // Keeps RFC 7519 claim names (sub, email) instead of the legacy WS-Federation mapping.
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOpts.Issuer,
+            ValidAudience = jwtOpts.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOpts.Key)),
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -16,6 +46,9 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     await db.Database.MigrateAsync();
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapGet("/v1/health", async (ApplicationDbContext db, CancellationToken ct) =>
 {
     var canConnect = await db.Database.CanConnectAsync(ct);
@@ -26,6 +59,9 @@ app.MapGet("/v1/health", async (ApplicationDbContext db, CancellationToken ct) =
         timestamp = DateTime.UtcNow,
     });
 });
+
+app.MapAuthEndpoints();
+app.MapUsersEndpoints();
 
 await app.RunAsync();
 
