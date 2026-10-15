@@ -46,14 +46,14 @@ Hoje existe um planner no Notability (iPad) que funciona por ciclos de ~3 meses 
 |---|---|---|
 | **InboxItem** (despejo) | `text`, `createdAt`, `source` (`widget` \| `tile` \| `share` \| `app`), `state` | Estados: `raw → processed \| incubated \| discarded`. Só `text` é obrigatório. Processar é opcional. |
 | **Task** | `title`, `notes?`, `dueDate?`, `dueKind?` (`hard` \| `soft`), `pinnedToToday` | `hard` = prazo real, aparece com destaque gentil. `soft` = "seria bom até", nunca vira atrasado e sai do destaque quando passa. |
-| **Step** | `taskId` *ou* (`routineId` + `plan`), `order`, `title`, `energy` (`low` \| `medium` \| `hyperfocus`), `doneAt?` | Micro-passo. Rotinas usam `plan` = `A` \| `C`. |
+| **Step** | `taskId` *ou* (`routineId` + `plan`), `order`, `title`, `energy` (`low` \| `medium` \| `hyperfocus`), `doneAt?` | Micro-passo. Rotinas usam `plan` = `a` \| `c`. |
 | **Anchor** | `name`, `windowStart`, `windowEnd` | Evento do dia definido pela usuária ("Acordei", "Almocei"). |
 | **AnchorEvent** | `anchorId`, `day`, `triggeredAt`, `source` (`tap` \| `window`) | Marca que a âncora aconteceu naquele dia. |
 | **Routine** | `name`, `anchorId`, `weekdays` | Passos do Plano A e do Plano C via `Step`. |
-| **RoutineLog** | `routineId`, `day`, `outcome` (`A` \| `C` \| `skipped`) | Plano C conta como sucesso. Sem streak, sem "falhou". |
+| **RoutineLog** | `routineId`, `day`, `outcome` (`a` \| `c` \| `skipped`) | Plano C conta como sucesso. Sem streak, sem "falhou". |
 | **DayEnergy** | `day`, `level` (`low` \| `medium` \| `high`), `setAt` | Pode mudar a qualquer momento. Vale o último valor. |
 
-Todas as entidades têm `id` (UUID gerado no cliente), `updatedAt` e `deletedAt?` (soft delete) para o sync.
+Todas as entidades têm `id` (UUID gerado no cliente), `updatedAt` e `deletedAt?` (soft delete) para o sync. No fio, valores de enum vão em minúsculas, como o banco local guarda, e todo payload leva também `updatedAt` (ISO), que o servidor guarda sem validar.
 
 ### Regras de domínio
 
