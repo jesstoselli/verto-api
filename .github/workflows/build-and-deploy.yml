@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   REGISTRY: ghcr.io
@@ -18,13 +17,17 @@ jobs:
   build:
     name: Build & Push image
     runs-on: ubuntu-latest
+    # Only this job publishes the image the VPS runs.
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
 
@@ -42,7 +45,7 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -50,7 +53,7 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
@@ -58,10 +61,10 @@ jobs:
             type=sha,prefix=,suffix=,format=short
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build & push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           push: true
@@ -92,14 +95,15 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" 'bash -se' <<'REMOTE_EOF'
           set -euo pipefail
-          # Verto shares the BillFolder compose project so it reaches the same Postgres container.
+          # Verto shares the BillFolder compose project so it reaches the same Postgres container;
+          # --no-deps keeps a Verto deploy from recreating BillFolder's postgres service.
           cd /opt/billfolder
 
           echo "==> Pulling latest Verto image..."
           docker compose pull verto-api
 
           echo "==> Recreating Verto container..."
-          docker compose up -d verto-api
+          docker compose up -d --no-deps verto-api
 
           echo "==> Cleaning up dangling images..."
           docker image prune -f

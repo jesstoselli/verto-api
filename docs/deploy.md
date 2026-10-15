@@ -47,6 +47,8 @@ Add to `/opt/billfolder/docker-compose.yml` under `services:` (replace `<owner>`
   verto-api:
     image: ghcr.io/<owner>/verto-api:latest
     restart: unless-stopped
+    # Caps Verto's memory so an Argon2 login burst can't push the host into OOM-killing BillFolder.
+    mem_limit: 512m
     depends_on:
       - postgres
     ports:
@@ -70,6 +72,9 @@ sudo tee /etc/nginx/sites-available/verto-api.billfolder.app > /dev/null <<'NGIN
 server {
     listen 80;
     server_name verto-api.billfolder.app;
+
+    # A full sync push (500 records x 64 KB) is ~32 MB; nginx's 1 MB default would 413 it.
+    client_max_body_size 40m;
 
     location / {
         proxy_pass http://127.0.0.1:8081;
@@ -103,7 +108,7 @@ Verify: `curl -fsS https://verto-api.billfolder.app/v1/health` → `"status":"ok
 curl -fsS -X POST https://verto-api.billfolder.app/v1/auth/signup \
   -H "Content-Type: application/json" \
   -d '{"email":"<your email>","password":"<strong password>","displayName":"Jess"}' > /dev/null && echo created
-ssh deploy@<VPS_HOST> 'cd /opt/billfolder && sed -i "s/^VERTO_ALLOW_SIGNUP=true/VERTO_ALLOW_SIGNUP=false/" .env && docker compose up -d verto-api'
+ssh deploy@<VPS_HOST> 'cd /opt/billfolder && sed -i "s/^VERTO_ALLOW_SIGNUP=true/VERTO_ALLOW_SIGNUP=false/" .env && docker compose up -d --no-deps verto-api'
 ```
 
 Verify: the same signup `curl` with another email now returns HTTP 403.

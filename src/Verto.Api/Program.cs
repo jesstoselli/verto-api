@@ -1,5 +1,7 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -9,6 +11,9 @@ using Verto.Infrastructure.Auth;
 using Verto.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Matches nginx's client_max_body_size: a full push (500 x 64 KB payloads) exceeds Kestrel's 30 MB default.
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 40 * 1024 * 1024);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -35,6 +40,19 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Each Argon2id check allocates 64 MB; capping concurrency keeps a login burst
+    // from exhausting the VPS that also runs BillFolder.
+    options.AddConcurrencyLimiter(AuthEndpoints.RateLimitPolicy, limiter =>
+    {
+        limiter.PermitLimit = 2;
+        limiter.QueueLimit = 4;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
 
 var app = builder.Build();
 
@@ -48,6 +66,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/v1/health", async (ApplicationDbContext db, CancellationToken ct) =>
 {
