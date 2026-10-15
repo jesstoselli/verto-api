@@ -164,6 +164,9 @@ dotnet_diagnostic.MA0040.severity = none
 # ============================================================================
 [**/Migrations/*.cs]
 
+# EF Core emits inline arrays for composite indexes
+dotnet_diagnostic.CA1861.severity = none
+
 # Block-scoped namespace é o que o EF Core gera por default
 dotnet_diagnostic.IDE0161.severity = none
 

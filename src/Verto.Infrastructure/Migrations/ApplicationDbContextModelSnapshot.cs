@@ -22,6 +22,8 @@ namespace Verto.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("sync_version_seq");
+
             modelBuilder.Entity("Verto.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -69,6 +71,50 @@ namespace Verto.Infrastructure.Migrations
                         .HasDatabaseName("ix_refresh_tokens_user_id");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Verto.Domain.Entities.SyncRecord", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ClientUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("client_updated_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<long>("ServerVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("server_version");
+
+                    b.HasKey("UserId", "EntityType", "Id");
+
+                    b.HasIndex("UserId", "ServerVersion")
+                        .HasDatabaseName("ix_sync_records_user_version");
+
+                    b.ToTable("sync_records", (string)null);
                 });
 
             modelBuilder.Entity("Verto.Domain.Entities.User", b =>
@@ -125,6 +171,15 @@ namespace Verto.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Verto.Domain.Entities.SyncRecord", b =>
+                {
+                    b.HasOne("Verto.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Verto.Domain.Entities.User", b =>

@@ -5,10 +5,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Verto.Application.Abstractions.Auth;
 using Verto.Application.Abstractions.Persistence;
+using Verto.Application.Abstractions.Sync;
 using Verto.Application.UseCases.Auth;
+using Verto.Application.UseCases.Sync;
 using Verto.Application.Validators.Auth;
 using Verto.Infrastructure.Auth;
 using Verto.Infrastructure.Persistence;
+using Verto.Infrastructure.Sync;
 
 namespace Verto.Infrastructure;
 
@@ -46,6 +49,8 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddScoped<AuthService>();
+        services.AddSingleton<ISyncStore, SyncStore>();
+        services.AddScoped<SyncService>();
 
         services.AddValidatorsFromAssemblyContaining<SignupRequestValidator>();
 

@@ -31,6 +31,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Global, strictly increasing pull cursor. Timestamps would break under device clock skew.
+        modelBuilder.HasSequence<long>("sync_version_seq");
     }
 
     private sealed class ApplicationDbTransaction(IDbContextTransaction transaction) : IApplicationDbTransaction
