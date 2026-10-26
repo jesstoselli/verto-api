@@ -10,6 +10,9 @@ namespace Verto.Infrastructure.Sync;
 public sealed class SyncStore : ISyncStore
 {
     // nextval runs even on conflict, so EXCLUDED.server_version carries the new version.
+    // The WHERE keeps a record a phone edited later: whole-record payloads mean an older
+    // push would otherwise undo it (e.g. reopen a task finished on the other phone).
+    // No row comes back in that case, which is how a stale change is told apart.
     private const string UpsertSql = """
         INSERT INTO sync_records
             (user_id, entity_type, id, payload, deleted_at, client_updated_at, server_version, received_at)
@@ -20,6 +23,7 @@ public sealed class SyncStore : ISyncStore
             client_updated_at = EXCLUDED.client_updated_at,
             server_version = EXCLUDED.server_version,
             received_at = EXCLUDED.received_at
+        WHERE sync_records.client_updated_at <= EXCLUDED.client_updated_at
         RETURNING server_version
         """;
 
@@ -41,7 +45,7 @@ public sealed class SyncStore : ISyncStore
     // Class 22 = data exception: content System.Text.Json accepts but jsonb does not.
     private const string DataExceptionClass = "22";
 
-    public async Task<IReadOnlyList<long?>> UpsertBatchAsync(
+    public async Task<IReadOnlyList<UpsertOutcome>> UpsertBatchAsync(
         Guid userId,
         IReadOnlyList<SyncChangeIn> changes,
         CancellationToken ct)
@@ -59,7 +63,7 @@ public sealed class SyncStore : ISyncStore
             await lockCommand.ExecuteNonQueryAsync(ct);
         }
 
-        var versions = new List<long?>(changes.Count);
+        var outcomes = new List<UpsertOutcome>(changes.Count);
         foreach (var change in changes)
         {
             // One unstorable record must not roll back the rest of the batch, or the
@@ -85,17 +89,19 @@ public sealed class SyncStore : ISyncStore
             try
             {
                 var version = await command.ExecuteScalarAsync(ct);
-                versions.Add((long)version!);
+                outcomes.Add(version is long stored
+                    ? new UpsertOutcome(UpsertStatus.Stored, stored)
+                    : new UpsertOutcome(UpsertStatus.Stale));
             }
             catch (PostgresException ex) when (ex.SqlState.StartsWith(DataExceptionClass, StringComparison.Ordinal))
             {
                 await transaction.RollbackAsync("change", ct);
-                versions.Add(null);
+                outcomes.Add(new UpsertOutcome(UpsertStatus.Unstorable));
             }
         }
 
         await transaction.CommitAsync(ct);
-        return versions;
+        return outcomes;
     }
 
     public async Task<IReadOnlyList<SyncChangeOut>> ReadSinceAsync(

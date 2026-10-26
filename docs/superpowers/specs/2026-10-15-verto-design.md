@@ -117,7 +117,7 @@ Paleta calma com modo escuro, sem vermelho de alerta, tipografia grande, muito e
 - **Cliente**: toda escrita vai para o Room e para uma tabela **outbox** na mesma transação. O sync roda ao abrir o app, alguns segundos depois de cada mudança e periodicamente (WorkManager).
 - **Push**: envia os registros do outbox (registro inteiro, não diff). O servidor faz upsert por `id` + `user_id` e atribui `server_version` de uma sequência global do Postgres.
 - **Pull**: devolve registros com `server_version > since`, incluindo os apagados (`deleted_at`). O cliente aplica e guarda o maior `server_version` como cursor.
-- **Conflito**: vale a última escrita que chegou no servidor. Pull aplicado sobre registro com mudança local ainda no outbox mantém a versão local, que será enviada no próximo push.
+- **Conflito**: vale a edição mais recente pelo `clientUpdatedAt`. Uma mudança mais antiga que a guardada é recusada com o erro `stale` e o servidor mantém a mais nova (decisão de 2026-10-26: sem isso, um celular desatualizado desfazia o que foi feito no outro, porque o payload é o registro inteiro). Empate de horário: vence quem chega por último. Pull aplicado sobre registro com mudança local ainda no outbox mantém a versão local, que será enviada no próximo push.
 - **Falhas**: nunca bloqueiam a UI. Retry com backoff. Estado aparece só em Ajustes.
 
 ## Infra

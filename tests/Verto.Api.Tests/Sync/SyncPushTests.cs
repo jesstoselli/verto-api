@@ -31,6 +31,56 @@ public sealed class SyncPushTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Push_OlderThanStored_IsRejectedAsStale_AndKeepsTheNewerRecord()
+    {
+        using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
+        var id = Guid.NewGuid();
+        var newer = new DateTimeOffset(2026, 10, 26, 15, 0, 0, TimeSpan.Zero);
+        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "feito no outro celular", newer));
+
+        var result = await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "versão velha", newer.AddMinutes(-5)));
+
+        result.Accepted.Should().BeEmpty();
+        result.Rejected.Should().ContainSingle().Which.Error.Should().Be("stale");
+        var pull = await SyncTestData.PullAsync(client, since: 0);
+        pull.Changes.Single(c => c.Id == id).Payload.GetProperty("text").GetString().Should().Be("feito no outro celular");
+    }
+
+    [Fact]
+    public async Task Push_SameOrNewerThanStored_Overwrites()
+    {
+        using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
+        var id = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 10, 26, 15, 0, 0, TimeSpan.Zero);
+        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "primeira", at));
+
+        var same = await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "mesmo instante", at));
+        var later = await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "depois", at.AddMinutes(1)));
+
+        same.Accepted.Should().ContainSingle();
+        later.Accepted.Should().ContainSingle();
+        var pull = await SyncTestData.PullAsync(client, since: 0);
+        pull.Changes.Single(c => c.Id == id).Payload.GetProperty("text").GetString().Should().Be("depois");
+    }
+
+    [Fact]
+    public async Task Push_StaleChange_DoesNotBlockTheRestOfTheBatch()
+    {
+        using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
+        var id = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 10, 26, 15, 0, 0, TimeSpan.Zero);
+        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "nova", at));
+
+        var result = await SyncTestData.PushAsync(
+            client,
+            SyncTestData.InboxItem(id, "velha", at.AddHours(-1)),
+            SyncTestData.InboxItem(Guid.NewGuid(), "outra coisa"));
+
+        result.Accepted.Should().ContainSingle();
+        result.Rejected.Should().ContainSingle().Which.Error.Should().Be("stale");
+    }
+
+    [Fact]
     public async Task Push_InvalidRecords_AreRejectedWithoutBlockingValidOnes()
     {
         using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);

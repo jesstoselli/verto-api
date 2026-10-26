@@ -90,18 +90,18 @@ public sealed class SyncPullTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Pull_SameIdPushedTwice_ArrivalOrderWins_EvenWithOlderClientClock()
+    public async Task Pull_SameIdPushedTwice_TheLaterEditWins_EvenWhenItArrivesFirst()
     {
         using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
         var id = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "relógio certo", clientUpdatedAt: now));
-        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "relógio atrasado", clientUpdatedAt: now.AddDays(-1)));
+        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "editado depois", clientUpdatedAt: now));
+        await SyncTestData.PushAsync(client, SyncTestData.InboxItem(id, "editado antes", clientUpdatedAt: now.AddDays(-1)));
 
         var pull = await SyncTestData.PullAsync(client, since: 0);
 
         pull.Changes.Should().ContainSingle();
-        pull.Changes[0].Payload.GetProperty("text").GetString().Should().Be("relógio atrasado");
+        pull.Changes[0].Payload.GetProperty("text").GetString().Should().Be("editado depois");
     }
 
     [Fact]
