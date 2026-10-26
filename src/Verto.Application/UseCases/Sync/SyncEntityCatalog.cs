@@ -22,6 +22,7 @@ public static class SyncEntityCatalog
         ["routine"] = ["name", "anchorId", "weekdays"],
         ["routine_log"] = ["routineId", "day", "outcome"],
         ["day_energy"] = ["day", "level", "setAt"],
+        ["category"] = ["name", "color"],
     };
 
     public static string? Validate(SyncChangeIn change)

@@ -103,6 +103,22 @@ public sealed class SyncPushTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Push_Category_IsAccepted_AndNeedsNameAndColor()
+    {
+        using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
+        var workId = Guid.NewGuid();
+        var nameless = Guid.NewGuid();
+
+        var result = await SyncTestData.PushAsync(
+            client,
+            new { entityType = "category", id = workId, payload = new { name = "Trabalho", color = "lagoon" }, clientUpdatedAt = DateTimeOffset.UtcNow },
+            new { entityType = "category", id = nameless, payload = new { color = "violet" }, clientUpdatedAt = DateTimeOffset.UtcNow });
+
+        result.Accepted.Select(a => a.Id).Should().Equal(workId);
+        result.Rejected.Should().ContainEquivalentOf(new { Id = nameless, Error = "missing_field:name" });
+    }
+
+    [Fact]
     public async Task Push_Tombstone_SkipsRequiredFieldCheck()
     {
         using var client = await AuthTestClient.CreateAuthorizedClientAsync(_factory);
