@@ -2,15 +2,21 @@
 
 Executar na ordem. A VPS e o Postgres são os mesmos do BillFolder, então cada passo tem uma verificação.
 
-**Antes de colar qualquer bloco, olhe o prompt.** `>` (zsh) é o seu Mac; `deploy@billfolder-prod` é a VPS. Os passos dizem onde cada comando roda.
+**Antes de colar qualquer bloco, olhe o prompt.** `>` (zsh) é o seu Mac; o prompt da VPS (`usuário@host`) é a VPS. Os passos dizem onde cada comando roda.
+
+Os dados de acesso da VPS ficam fora do repositório. Antes de seguir, defina no terminal do Mac (valores no gerenciador de senhas e no painel da Hetzner):
+
+```bash
+export VPS_IP="…" VPS_USER="…" VPS_KEY="$HOME/.ssh/…"
+```
 
 Valores fixos desta instalação:
 
 | O quê | Valor |
 |---|---|
-| IP da VPS | `178.104.160.8` |
-| Usuário SSH | `deploy` (tem `sudo` completo, com senha) |
-| Chave SSH | `~/.ssh/billfolder_deploy_key` |
+| IP da VPS | `$VPS_IP` (painel da Hetzner) |
+| Usuário SSH | `$VPS_USER` (tem `sudo` completo, com senha) |
+| Chave SSH | `$VPS_KEY` (caminho da chave privada no Mac) |
 | Pasta do compose | `/opt/billfolder` (arquivo `compose.yml`, rede `billfolder`) |
 | Host da API | `verto-api.billfolder.app` |
 | Imagem | `ghcr.io/jesstoselli/verto-api:latest` |
@@ -18,7 +24,7 @@ Valores fixos desta instalação:
 Entrar na VPS (do Mac):
 
 ```bash
-ssh -i ~/.ssh/billfolder_deploy_key deploy@178.104.160.8
+ssh -i "$VPS_KEY" "$VPS_USER@$VPS_IP"
 ```
 
 ## 1. Repo no GitHub e secrets (Mac)
@@ -28,12 +34,12 @@ Cadastre os secrets **antes** do primeiro push: o `gh repo create ... --push` j�
 ```bash
 cd ~/Repos/Verto
 gh repo create verto-api --private --source=. --remote=origin
-gh secret set VPS_HOST --body "178.104.160.8"
-gh secret set VPS_USER --body "deploy"
-gh secret set VPS_SSH_KEY < ~/.ssh/billfolder_deploy_key
+gh secret set VPS_HOST --body "$VPS_IP"
+gh secret set VPS_USER --body "$VPS_USER"
+gh secret set VPS_SSH_KEY < "$VPS_KEY"
 ```
 
-Os secrets do GitHub não podem ser lidos de volta (nem os do BillFolder): os valores vêm da tabela acima. Para conferir a chave antes: `ssh -i ~/.ssh/billfolder_deploy_key -o BatchMode=yes deploy@178.104.160.8 whoami` deve responder `deploy`.
+Os secrets do GitHub não podem ser lidos de volta (nem os do BillFolder): os valores vêm da tabela acima. Para conferir a chave antes: `ssh -i "$VPS_KEY" -o BatchMode=yes "$VPS_USER@$VPS_IP" whoami` deve responder o `$VPS_USER`.
 
 ## 2. DNS na Cloudflare
 
@@ -43,12 +49,12 @@ Painel → `billfolder.app` → **DNS → Records → Add record**:
 |---|---|
 | Type | `A` |
 | Name | `verto-api` |
-| IPv4 | `178.104.160.8` |
+| IPv4 | `$VPS_IP` |
 | Proxy status | **DNS only** (nuvem cinza, igual ao registro `api`) |
 
 DNS only é o que deixa o `certbot` (passo 5) emitir o certificado direto na VPS.
 
-Verificar (Mac): `dig +short verto-api.billfolder.app` → `178.104.160.8`.
+Verificar (Mac): `dig +short verto-api.billfolder.app` → o `$VPS_IP`.
 
 ## 3. Banco e role (VPS)
 
@@ -123,7 +129,7 @@ Não rode `docker compose up` aqui: a imagem só existe no GHCR depois do passo 
 
 ## 5. nginx + TLS (VPS)
 
-Precisa de `sudo` com a senha do `deploy`. Confira com `sudo -v && echo SUDO_OK`.
+Precisa de `sudo` com a senha do usuário de deploy. Confira com `sudo -v && echo SUDO_OK`.
 
 ```bash
 ls /etc/nginx/sites-enabled && certbot --version
@@ -156,14 +162,14 @@ sudo certbot --nginx -d verto-api.billfolder.app
 
 Esperado: `syntax is ok`, `test is successful` e `Successfully deployed certificate`. Até o passo 6, o endereço responde 502 (o container ainda não existe).
 
-### Se a senha do `sudo` do `deploy` não funcionar
+### Se a senha do `sudo` do usuário de deploy não funcionar
 
 O root só aceita chave por SSH e o console web da Hetzner costuma errar caracteres (teclado US, sem colar). O caminho que funciona:
 
 1. Hetzner Console → **Servers → billfolder-prod → Rescue → Reset root password** (só esse botão; "Enable rescue & power cycle", Power, Rebuild e Delete reiniciam ou apagam a VPS). Guarde a senha nova.
-2. No Mac, entre como `deploy` por SSH e rode `su -`, colando a senha nova do root.
-3. Como root: `passwd deploy` → defina e guarde a senha do `deploy`. `exit`.
-4. Como `deploy`: `sudo -v && echo SUDO_OK`.
+2. No Mac, entre como o usuário de deploy por SSH e rode `su -`, colando a senha nova do root.
+3. Como root: `passwd <usuário de deploy>` → defina e guarde a senha do usuário de deploy. `exit`.
+4. Como o usuário de deploy: `sudo -v && echo SUDO_OK`.
 
 ## 6. Deploy (Mac)
 
@@ -192,7 +198,7 @@ read "VERTO_EMAIL?Email: "; read -s "VERTO_PASS?Senha (min. 8): "; echo; jq -n -
 Fechar o cadastro (Mac):
 
 ```bash
-ssh -i ~/.ssh/billfolder_deploy_key deploy@178.104.160.8 'cd /opt/billfolder && sed -i "s/^VERTO_ALLOW_SIGNUP=true/VERTO_ALLOW_SIGNUP=false/" .env && docker compose up -d --no-deps verto-api'
+ssh -i "$VPS_KEY" "$VPS_USER@$VPS_IP" 'cd /opt/billfolder && sed -i "s/^VERTO_ALLOW_SIGNUP=true/VERTO_ALLOW_SIGNUP=false/" .env && docker compose up -d --no-deps verto-api'
 ```
 
 Verificar: deve dar `403`.
@@ -203,7 +209,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://verto-api.billfolder.a
 
 ## 8. Backup diário (VPS)
 
-O BillFolder já faz backup às 03:00 pelo crontab do `deploy` (`/opt/billfolder/scripts/backup.sh`). O do Verto roda às 03:15, guarda 14 dias e registra tudo (inclusive erros do `pg_dump`) em `/opt/billfolder/logs/backup-verto.log`:
+O BillFolder já faz backup às 03:00 pelo crontab do usuário de deploy (`/opt/billfolder/scripts/backup.sh`). O do Verto roda às 03:15, guarda 14 dias e registra tudo (inclusive erros do `pg_dump`) em `/opt/billfolder/logs/backup-verto.log`:
 
 ```bash
 (crontab -l | grep -v 'verto-'; echo '15 3 * * * { cd /opt/billfolder && docker compose exec -T postgres pg_dump -U billfolder verto | gzip > /opt/billfolder/backups/verto-$(date +\%F).sql.gz && find /opt/billfolder/backups -name "verto-*.sql.gz" -mtime +14 -delete; } >> /opt/billfolder/logs/backup-verto.log 2>&1') | crontab -
